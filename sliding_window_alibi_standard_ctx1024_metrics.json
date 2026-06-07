@@ -1,0 +1,42 @@
+{
+  "attention_type": "sliding_window",
+  "positional_encoding_type": "alibi",
+  "block_type": "standard",
+  "device": "cpu",
+  "context_length": 1024,
+  "batch_size": 2,
+  "d_model": 128,
+  "n_heads": 4,
+  "n_layers": 2,
+  "d_ff": 256,
+  "dropout": 0.1,
+  "window_size": 128,
+  "relative_max_distance": 128,
+  "kernel_size": 3,
+  "learning_rate": 0.0003,
+  "num_epochs": 1,
+  "max_train_steps": 1000,
+  "validate_every": 100,
+  "final_validation_loss": 6.254408619403839,
+  "final_validation_perplexity": 520.3015874936963,
+  "final_inference_throughput_tokens_per_sec": 13493.3561083231,
+  "peak_gpu_memory_mb": null,
+  "epoch_times_sec": [
+    1686.9326221942902
+  ],
+  "final_test_loss": 6.577813653945923,
+  "final_test_perplexity": 718.9657018037693,
+  "stability": {
+    "nan_detected": false,
+    "inf_detected": false,
+    "max_grad_norm_seen": 1.2073881596978686,
+    "loss_remained_finite": true
+  },
+  "plots": {
+    "train_loss": "sliding_window_alibi_standard_ctx1024_benchmark_train_loss.png",
+    "val_loss": "sliding_window_alibi_standard_ctx1024_benchmark_val_loss.png",
+    "val_ppl": "sliding_window_alibi_standard_ctx1024_benchmark_val_ppl.png",
+    "throughput": "sliding_window_alibi_standard_ctx1024_benchmark_throughput.png"
+  },
+  "checkpoint": "sliding_window_alibi_standard_ctx1024_best_checkpoint.pt"
+}

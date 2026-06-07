@@ -21,7 +21,7 @@ def evaluate_loss_and_ppl(model, data_loader, criterion, device, max_steps=None)
             x = x.to(device)
             y = y.to(device)
 
-            logits = model(x)  # [B, L, V]
+            logits = model(x)
             B, L, V = logits.shape
 
             loss = criterion(
@@ -135,10 +135,11 @@ def main():
     # ============================================================
     # CONFIG
     # ============================================================
-    attention_type = "sliding_window"   # currently supported by your transformer_lm.py
-    positional_encoding_type = "relative"   # "rope" | "alibi" | "relative"
+    attention_type = "sliding_window"
+    positional_encoding_type = "alibi"      # "rope" | "alibi" | "relative"
+    block_type = "standard"         # "standard" | "conv_before_attn" | "conv_ffn"
 
-    context_length = 2048
+    context_length = 1024
     batch_size = 2
     d_model = 128
     n_heads = 4
@@ -148,6 +149,7 @@ def main():
 
     window_size = 128
     relative_max_distance = 128
+    kernel_size = 3
 
     learning_rate = 3e-4
     num_epochs = 1
@@ -158,9 +160,18 @@ def main():
     max_infer_steps = 100
     max_mem_steps = 20
 
-    output_prefix = f"{attention_type}_{positional_encoding_type}_benchmark"
-    checkpoint_path = f"{attention_type}_{positional_encoding_type}_best_checkpoint.pt"
-    metrics_path = f"{attention_type}_{positional_encoding_type}_metrics.json"
+    output_prefix = (
+        f"{attention_type}_{positional_encoding_type}_{block_type}_"
+        f"ctx{context_length}_benchmark"
+    )
+    checkpoint_path = (
+        f"{attention_type}_{positional_encoding_type}_{block_type}_"
+        f"ctx{context_length}_best_checkpoint.pt"
+    )
+    metrics_path = (
+        f"{attention_type}_{positional_encoding_type}_{block_type}_"
+        f"ctx{context_length}_metrics.json"
+    )
     # ============================================================
 
     train_loader, valid_loader, test_loader, tokenizer = build_dataloaders(
@@ -181,8 +192,10 @@ def main():
         dropout=dropout,
         attention_type=attention_type,
         positional_encoding_type=positional_encoding_type,
+        block_type=block_type,
         window_size=window_size,
         relative_max_distance=relative_max_distance,
+        kernel_size=kernel_size,
     ).to(device)
 
     criterion = nn.CrossEntropyLoss()
@@ -207,11 +220,12 @@ def main():
     inf_detected = False
     max_grad_norm_seen = 0.0
 
-    print("=" * 70)
+    print("=" * 80)
     print("Starting benchmark")
     print(f"Device                   : {device}")
     print(f"Attention type           : {attention_type}")
     print(f"Positional encoding type : {positional_encoding_type}")
+    print(f"Block type               : {block_type}")
     print(f"Context length           : {context_length}")
     print(f"Batch size               : {batch_size}")
     print(f"Vocab size               : {vocab_size}")
@@ -221,9 +235,10 @@ def main():
     print(f"d_ff                     : {d_ff}")
     print(f"Window size              : {window_size}")
     print(f"Relative max distance    : {relative_max_distance}")
+    print(f"Kernel size              : {kernel_size}")
     print(f"Max train steps          : {max_train_steps}")
     print(f"Validate every           : {validate_every}")
-    print("=" * 70)
+    print("=" * 80)
 
     global_step = 0
     epoch_times = []
@@ -304,7 +319,7 @@ def main():
                     max_steps=max_mem_steps,
                 )
 
-                print("-" * 70)
+                print("-" * 80)
                 print(f"Epoch {epoch + 1}/{num_epochs} | Step {global_step}")
                 print(f"Train batch loss        : {loss.item():.4f}")
                 print(f"Validation loss         : {val_loss:.4f}")
@@ -339,6 +354,7 @@ def main():
                             "config": {
                                 "attention_type": attention_type,
                                 "positional_encoding_type": positional_encoding_type,
+                                "block_type": block_type,
                                 "context_length": context_length,
                                 "batch_size": batch_size,
                                 "d_model": d_model,
@@ -348,6 +364,7 @@ def main():
                                 "dropout": dropout,
                                 "window_size": window_size,
                                 "relative_max_distance": relative_max_distance,
+                                "kernel_size": kernel_size,
                                 "learning_rate": learning_rate,
                             },
                         },
@@ -422,6 +439,7 @@ def main():
     metrics = {
         "attention_type": attention_type,
         "positional_encoding_type": positional_encoding_type,
+        "block_type": block_type,
         "device": str(device),
         "context_length": context_length,
         "batch_size": batch_size,
@@ -432,6 +450,7 @@ def main():
         "dropout": dropout,
         "window_size": window_size,
         "relative_max_distance": relative_max_distance,
+        "kernel_size": kernel_size,
         "learning_rate": learning_rate,
         "num_epochs": num_epochs,
         "max_train_steps": max_train_steps,
@@ -456,10 +475,11 @@ def main():
     with open(metrics_path, "w") as f:
         json.dump(metrics, f, indent=2)
 
-    print("=" * 70)
+    print("=" * 80)
     print("FINAL BENCHMARK SUMMARY")
     print(f"Attention type         : {attention_type}")
     print(f"Positional encoding    : {positional_encoding_type}")
+    print(f"Block type             : {block_type}")
     print(f"Validation loss        : {final_val_loss:.4f}")
     print(f"Validation perplexity  : {final_val_ppl:.4f}")
     print(f"Inference throughput   : {final_infer_throughput:.2f} tokens/sec")
@@ -473,7 +493,7 @@ def main():
     print(f"Saved checkpoint       : {checkpoint_path}")
     print(f"Saved metrics JSON     : {metrics_path}")
     print(f"Saved plots prefix     : {output_prefix}_*.png")
-    print("=" * 70)
+    print("=" * 80)
 
 
 if __name__ == "__main__":

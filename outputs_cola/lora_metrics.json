@@ -1,0 +1,50 @@
+{
+  "method": "lora",
+  "model_name": "microsoft/deberta-v3-base",
+  "device": "cpu",
+  "trainable_params": 1340930,
+  "total_params": 185764612,
+  "configured_rank": 8,
+  "alpha": 16.0,
+  "sora_lambda": 0.0001,
+  "num_epochs": 3,
+  "learning_rate": 0.0002,
+  "weight_decay": 0.01,
+  "warmup_ratio": 0.1,
+  "final_eval_loss": 0.4130680621601641,
+  "final_mcc": 0.6505778114323791,
+  "total_train_time_sec": 1664.4491000175476,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.4320155727041659,
+      "eval_loss": 0.3899198536845771,
+      "mcc": 0.6457236074037789,
+      "epoch_time_sec": 566.3525149822235,
+      "effective_rank_note": "fixed-rank LoRA",
+      "configured_rank": 8
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.28359460519087093,
+      "eval_loss": 0.36375032035125926,
+      "mcc": 0.66781313116373,
+      "epoch_time_sec": 534.2461838722229,
+      "effective_rank_note": "fixed-rank LoRA",
+      "configured_rank": 8
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.21330708191495076,
+      "eval_loss": 0.4130680621601641,
+      "mcc": 0.6505778114323791,
+      "epoch_time_sec": 514.5381939411163,
+      "effective_rank_note": "fixed-rank LoRA",
+      "configured_rank": 8
+    }
+  ],
+  "rank_info": {
+    "effective_rank_note": "fixed-rank LoRA",
+    "configured_rank": 8
+  }
+}
