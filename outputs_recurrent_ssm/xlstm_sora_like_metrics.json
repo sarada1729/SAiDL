@@ -1,0 +1,78 @@
+{
+  "architecture": "xlstm_like",
+  "method": "sora_like",
+  "trainable_params": 32801346,
+  "configured_rank": 8,
+  "final_eval_loss": 0.6182793049198209,
+  "final_mcc": 0.0,
+  "total_train_time_sec": 146.29427790641785,
+  "rank_info": {
+    "effective_rank_sum": 64,
+    "effective_rank_list": [
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8
+    ]
+  },
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.6187476553649546,
+      "eval_loss": 0.6182591129433025,
+      "mcc": 0.0,
+      "epoch_time_sec": 47.36053395271301,
+      "effective_rank_sum": 64,
+      "effective_rank_list": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.6111510910163416,
+      "eval_loss": 0.6198763608029394,
+      "mcc": 0.0,
+      "epoch_time_sec": 46.11174130439758,
+      "effective_rank_sum": 64,
+      "effective_rank_list": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.6063922627506969,
+      "eval_loss": 0.6182793049198209,
+      "mcc": 0.0,
+      "epoch_time_sec": 46.335025787353516,
+      "effective_rank_sum": 64,
+      "effective_rank_list": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    }
+  ]
+}

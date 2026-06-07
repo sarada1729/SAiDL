@@ -1,0 +1,42 @@
+{
+  "architecture": "xlstm_like",
+  "method": "lora",
+  "trainable_params": 32801282,
+  "configured_rank": 8,
+  "final_eval_loss": 0.6183400957873373,
+  "final_mcc": 0.0,
+  "total_train_time_sec": 152.6828396320343,
+  "rank_info": {
+    "configured_rank": 8,
+    "effective_rank_note": "fixed-rank LoRA"
+  },
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.6124830154057975,
+      "eval_loss": 0.6182525645602833,
+      "mcc": 0.0,
+      "epoch_time_sec": 53.26876497268677,
+      "configured_rank": 8,
+      "effective_rank_note": "fixed-rank LoRA"
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.6050165723417407,
+      "eval_loss": 0.619861727862647,
+      "mcc": 0.0,
+      "epoch_time_sec": 45.1432728767395,
+      "configured_rank": 8,
+      "effective_rank_note": "fixed-rank LoRA"
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.6000801906964489,
+      "eval_loss": 0.6183400957873373,
+      "mcc": 0.0,
+      "epoch_time_sec": 47.937668800354004,
+      "configured_rank": 8,
+      "effective_rank_note": "fixed-rank LoRA"
+    }
+  ]
+}

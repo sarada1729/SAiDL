@@ -1,0 +1,42 @@
+{
+  "architecture": "mamba_like",
+  "method": "lora",
+  "trainable_params": 32850434,
+  "configured_rank": 8,
+  "final_eval_loss": 0.6229618295575633,
+  "final_mcc": 0.021324732257988185,
+  "total_train_time_sec": 348.8028109073639,
+  "rank_info": {
+    "configured_rank": 8,
+    "effective_rank_note": "fixed-rank LoRA"
+  },
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.615109528225159,
+      "eval_loss": 0.619527385541887,
+      "mcc": 0.0,
+      "epoch_time_sec": 117.03604364395142,
+      "configured_rank": 8,
+      "effective_rank_note": "fixed-rank LoRA"
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.6074760836418543,
+      "eval_loss": 0.6222251125357368,
+      "mcc": 0.0,
+      "epoch_time_sec": 106.64224696159363,
+      "configured_rank": 8,
+      "effective_rank_note": "fixed-rank LoRA"
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.5960295516196813,
+      "eval_loss": 0.6229618295575633,
+      "mcc": 0.021324732257988185,
+      "epoch_time_sec": 106.53918123245239,
+      "configured_rank": 8,
+      "effective_rank_note": "fixed-rank LoRA"
+    }
+  ]
+}
