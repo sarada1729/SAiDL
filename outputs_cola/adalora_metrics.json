@@ -1,0 +1,50 @@
+{
+  "method": "adalora",
+  "model_name": "microsoft/deberta-v3-base",
+  "device": "cpu",
+  "trainable_params": 1341514,
+  "total_params": 185765269,
+  "configured_rank": 8,
+  "alpha": 16.0,
+  "sora_lambda": 0.0001,
+  "num_epochs": 3,
+  "learning_rate": 0.0002,
+  "weight_decay": 0.01,
+  "warmup_ratio": 0.1,
+  "final_eval_loss": 0.4105766418982636,
+  "final_mcc": 0.5880094937717885,
+  "total_train_time_sec": 1329.338238954544,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.7919867299427495,
+      "eval_loss": 0.5917649978038036,
+      "mcc": 0.0,
+      "epoch_time_sec": 417.05277013778687,
+      "effective_rank_note": "adaptive rank (inspect PEFT internals for per-layer details)",
+      "configured_rank": 8
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.4548491711371413,
+      "eval_loss": 0.45601289809653256,
+      "mcc": 0.5633676247508271,
+      "epoch_time_sec": 428.08866000175476,
+      "effective_rank_note": "adaptive rank (inspect PEFT internals for per-layer details)",
+      "configured_rank": 8
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.39291346836312907,
+      "eval_loss": 0.4105766418982636,
+      "mcc": 0.5880094937717885,
+      "epoch_time_sec": 441.3278441429138,
+      "effective_rank_note": "adaptive rank (inspect PEFT internals for per-layer details)",
+      "configured_rank": 8
+    }
+  ],
+  "rank_info": {
+    "effective_rank_note": "adaptive rank (inspect PEFT internals for per-layer details)",
+    "configured_rank": 8
+  }
+}

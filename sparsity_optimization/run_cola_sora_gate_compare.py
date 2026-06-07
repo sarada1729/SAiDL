@@ -8,7 +8,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from datasets import load_dataset
-from peft import AdaLoraConfig, LoraConfig, TaskType, get_peft_model
 from torch.utils.data import DataLoader
 from transformers import (
     AutoModelForSequenceClassification,
@@ -20,7 +19,6 @@ from transformers import (
 from sora_modules import (
     replace_linear_with_sora_like,
     get_sora_like_modules,
-    sora_l1_penalty,
 )
 
 
@@ -31,12 +29,18 @@ def set_seed(seed: int):
         torch.cuda.manual_seed_all(seed)
 
 
+def soft_threshold(x: torch.Tensor, tau: float) -> torch.Tensor:
+    return torch.sign(x) * torch.clamp(torch.abs(x) - tau, min=0.0)
+
+
+def l1_subgradient(x: torch.Tensor) -> torch.Tensor:
+    g = torch.sign(x)
+    g = torch.where(torch.abs(x) < 1e-12, torch.zeros_like(g), g)
+    return g
+
+
 def count_trainable_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-
-def count_total_parameters(model: nn.Module) -> int:
-    return sum(p.numel() for p in model.parameters())
 
 
 def build_dataloaders(model_name: str, batch_size: int, max_length: int = 256):
@@ -106,28 +110,28 @@ def evaluate_cola(model: nn.Module, dataloader: DataLoader, device: torch.device
     }
 
 
-def get_effective_rank_info(model: nn.Module, method: str, configured_rank: int):
-    if method == "lora":
-        return {
-            "effective_rank_note": "fixed-rank LoRA",
-            "configured_rank": configured_rank,
-        }
+def get_gate_params(model: nn.Module):
+    gate_params = []
+    non_gate_params = []
 
-    if method == "adalora":
-        return {
-            "effective_rank_note": "adaptive rank (inspect PEFT internals for per-layer details)",
-            "configured_rank": configured_rank,
-        }
+    for name, p in model.named_parameters():
+        if not p.requires_grad:
+            continue
+        if name.endswith(".g"):
+            gate_params.append((name, p))
+        else:
+            non_gate_params.append((name, p))
 
-    if method == "sora_like":
-        modules = get_sora_like_modules(model)
-        rank_list = [m.effective_rank() for m in modules]
-        return {
-            "effective_rank_sum": int(sum(rank_list)),
-            "effective_rank_list": rank_list,
-        }
+    return gate_params, non_gate_params
 
-    return {}
+
+def get_rank_info(model: nn.Module):
+    modules = get_sora_like_modules(model)
+    rank_list = [m.effective_rank() for m in modules]
+    return {
+        "effective_rank_sum": int(sum(rank_list)),
+        "effective_rank_list": rank_list,
+    }
 
 
 def train(
@@ -135,19 +139,21 @@ def train(
     train_loader: DataLoader,
     val_loader: DataLoader,
     device: torch.device,
-    lr: float,
+    lr_main: float,
+    lr_gate: float,
     weight_decay: float,
     num_epochs: int,
     warmup_ratio: float,
-    method: str,
-    configured_rank: int,
-    sora_lambda: float,
+    lam: float,
+    gate_update: str,
 ):
     model.to(device)
 
+    gate_params, non_gate_params = get_gate_params(model)
+
     optimizer = torch.optim.AdamW(
-        [p for p in model.parameters() if p.requires_grad],
-        lr=lr,
+        [p for _, p in non_gate_params],
+        lr=lr_main,
         weight_decay=weight_decay,
     )
 
@@ -170,30 +176,47 @@ def train(
         model.train()
         epoch_start = time.time()
 
-        running_loss = 0.0
+        running_task_loss = 0.0
         running_batches = 0
 
         for batch in train_loader:
             batch = {k: v.to(device) for k, v in batch.items()}
 
-            outputs = model(**batch)
-            loss = outputs.loss
-
-            if method == "sora_like":
-                loss = loss + sora_lambda * sora_l1_penalty(model)
-
             optimizer.zero_grad()
-            loss.backward()
+
+            # manually clear gate grads
+            for _, g in gate_params:
+                if g.grad is not None:
+                    g.grad.zero_()
+
+            outputs = model(**batch)
+            task_loss = outputs.loss
+            task_loss.backward()
+
+            # update non-gate trainable parameters normally
             optimizer.step()
             scheduler.step()
 
-            running_loss += loss.item()
+            # manual gate update
+            with torch.no_grad():
+                for _, g in gate_params:
+                    smooth_grad = g.grad.clone() if g.grad is not None else torch.zeros_like(g)
+
+                    if gate_update == "subgrad":
+                        g -= lr_gate * (smooth_grad + lam * l1_subgradient(g))
+                    elif gate_update == "prox":
+                        u = g - lr_gate * smooth_grad
+                        g.copy_(soft_threshold(u, lr_gate * lam))
+                    else:
+                        raise ValueError(f"Unknown gate_update: {gate_update}")
+
+            running_task_loss += task_loss.item()
             running_batches += 1
 
         epoch_time = time.time() - epoch_start
-        train_loss = running_loss / max(running_batches, 1)
-
+        train_loss = running_task_loss / max(running_batches, 1)
         val_metrics = evaluate_cola(model, val_loader, device)
+        rank_info = get_rank_info(model)
 
         row = {
             "epoch": epoch + 1,
@@ -201,8 +224,9 @@ def train(
             "eval_loss": val_metrics["eval_loss"],
             "mcc": val_metrics["mcc"],
             "epoch_time_sec": epoch_time,
+            "effective_rank_sum": rank_info["effective_rank_sum"],
+            "effective_rank_list": rank_info["effective_rank_list"],
         }
-        row.update(get_effective_rank_info(model, method, configured_rank))
         history.append(row)
 
         print(
@@ -210,6 +234,7 @@ def train(
             f"train_loss={train_loss:.4f} "
             f"eval_loss={val_metrics['eval_loss']:.4f} "
             f"mcc={val_metrics['mcc']:.4f} "
+            f"effective_rank_sum={rank_info['effective_rank_sum']} "
             f"time={epoch_time:.2f}s"
         )
 
@@ -224,35 +249,22 @@ def train(
     return history, best_state_dict, total_train_time
 
 
-def inspect_linear_names(model: nn.Module, limit: int = 200):
-    print("=" * 80)
-    print("Linear module names:")
-    count = 0
-    for name, module in model.named_modules():
-        if isinstance(module, nn.Linear):
-            print(name)
-            count += 1
-            if count >= limit:
-                break
-    print("=" * 80)
-
-
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--method", type=str, required=True, choices=["lora", "adalora", "sora_like"])
     parser.add_argument("--model_name", type=str, default="microsoft/deberta-v3-base")
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--num_epochs", type=int, default=3)
-    parser.add_argument("--lr", type=float, default=2e-4)
+    parser.add_argument("--lr_main", type=float, default=2e-4)
+    parser.add_argument("--lr_gate", type=float, default=2e-4)
     parser.add_argument("--weight_decay", type=float, default=0.01)
     parser.add_argument("--warmup_ratio", type=float, default=0.1)
     parser.add_argument("--rank", type=int, default=8)
     parser.add_argument("--alpha", type=float, default=16.0)
-    parser.add_argument("--sora_lambda", type=float, default=1e-4)
+    parser.add_argument("--lam", type=float, default=1e-4)
     parser.add_argument("--max_length", type=int, default=256)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--output_dir", type=str, default="outputs_cola")
-    parser.add_argument("--inspect_names_only", action="store_true")
+    parser.add_argument("--gate_update", type=str, required=True, choices=["prox", "subgrad"])
+    parser.add_argument("--output_dir", type=str, default="outputs_cola_sora_gate_compare")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -260,88 +272,43 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = AutoModelForSequenceClassification.from_pretrained(
-        args.model_name,
-        num_labels=2,
-    )
-
-    if args.inspect_names_only:
-        inspect_linear_names(model)
-        return
-
     train_loader, val_loader = build_dataloaders(
         model_name=args.model_name,
         batch_size=args.batch_size,
         max_length=args.max_length,
     )
 
-    # Confirmed from model inspection
+    model = AutoModelForSequenceClassification.from_pretrained(
+        args.model_name,
+        num_labels=2,
+    )
+
+    # freeze whole base model first
+    for p in model.parameters():
+        p.requires_grad = False
+
     target_modules = ["query_proj", "key_proj", "value_proj", "dense"]
 
-    if args.method == "lora":
-        peft_config = LoraConfig(
-            task_type=TaskType.SEQ_CLS,
-            r=args.rank,
-            lora_alpha=args.alpha,
-            lora_dropout=0.1,
-            target_modules=target_modules,
-            bias="none",
-        )
-        model = get_peft_model(model, peft_config)
+    model = replace_linear_with_sora_like(
+        model,
+        target_substrings=target_modules,
+        rank=args.rank,
+        alpha=args.alpha / args.rank,
+    )
 
-    elif args.method == "adalora":
-        total_steps = args.num_epochs * len(train_loader)
-
-        tinit = min(100, max(10, total_steps // 10))
-        tfinal = min(total_steps - 10, max(tinit + 10, (8 * total_steps) // 10))
-        deltaT = max(1, total_steps // 100)
-
-        peft_config = AdaLoraConfig(
-            task_type=TaskType.SEQ_CLS,
-            init_r=args.rank,
-            target_r=max(1, args.rank // 2),
-            lora_alpha=args.alpha,
-            lora_dropout=0.1,
-            target_modules=target_modules,
-            beta1=0.85,
-            beta2=0.85,
-            tinit=tinit,
-            tfinal=tfinal,
-            deltaT=deltaT,
-            orth_reg_weight=0.5,
-            total_step=total_steps,
-            bias="none",
-        )
-        model = get_peft_model(model, peft_config)
-
-    elif args.method == "sora_like":
-        for p in model.parameters():
-            p.requires_grad = False
-
-        model = replace_linear_with_sora_like(
-            model,
-            target_substrings=target_modules,
-            rank=args.rank,
-            alpha=args.alpha / args.rank,
-        )
-
-        # Keep classifier and pooler trainable
-        for name, p in model.named_parameters():
-            if "classifier" in name or "pooler" in name:
-                p.requires_grad = True
-
-    else:
-        raise ValueError("Unknown method")
+    # train classification head and pooler too
+    for name, p in model.named_parameters():
+        if "classifier" in name or "pooler" in name:
+            p.requires_grad = True
 
     trainable_params = count_trainable_parameters(model)
-    total_params = count_total_parameters(model)
 
     print("=" * 80)
-    print(f"method           : {args.method}")
+    print("SoRA gate update comparison")
+    print(f"gate_update      : {args.gate_update}")
     print(f"device           : {device}")
     print(f"model_name       : {args.model_name}")
     print(f"trainable_params : {trainable_params}")
-    print(f"total_params     : {total_params}")
     print(f"rank             : {args.rank}")
     print("=" * 80)
 
@@ -350,31 +317,30 @@ def main():
         train_loader=train_loader,
         val_loader=val_loader,
         device=device,
-        lr=args.lr,
+        lr_main=args.lr_main,
+        lr_gate=args.lr_gate,
         weight_decay=args.weight_decay,
         num_epochs=args.num_epochs,
         warmup_ratio=args.warmup_ratio,
-        method=args.method,
-        configured_rank=args.rank,
-        sora_lambda=args.sora_lambda,
+        lam=args.lam,
+        gate_update=args.gate_update,
     )
 
     final_eval = evaluate_cola(model, val_loader, device)
-    rank_info = get_effective_rank_info(model, args.method, args.rank)
+    rank_info = get_rank_info(model)
 
     metrics = {
-        "method": args.method,
+        "method": "sora_gate_compare",
+        "gate_update": args.gate_update,
         "model_name": args.model_name,
         "device": str(device),
         "trainable_params": trainable_params,
-        "total_params": total_params,
         "configured_rank": args.rank,
         "alpha": args.alpha,
-        "sora_lambda": args.sora_lambda,
+        "lambda": args.lam,
         "num_epochs": args.num_epochs,
-        "learning_rate": args.lr,
-        "weight_decay": args.weight_decay,
-        "warmup_ratio": args.warmup_ratio,
+        "lr_main": args.lr_main,
+        "lr_gate": args.lr_gate,
         "final_eval_loss": final_eval["eval_loss"],
         "final_mcc": final_eval["mcc"],
         "total_train_time_sec": total_train_time,
@@ -382,9 +348,8 @@ def main():
         "rank_info": rank_info,
     }
 
-    os.makedirs(args.output_dir, exist_ok=True)
-    metrics_path = os.path.join(args.output_dir, f"{args.method}_metrics.json")
-    ckpt_path = os.path.join(args.output_dir, f"{args.method}_best.pt")
+    metrics_path = os.path.join(args.output_dir, f"sora_{args.gate_update}_metrics.json")
+    ckpt_path = os.path.join(args.output_dir, f"sora_{args.gate_update}_best.pt")
 
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
@@ -394,7 +359,7 @@ def main():
 
     print("=" * 80)
     print("FINAL SUMMARY")
-    print(f"method           : {args.method}")
+    print(f"gate_update      : {args.gate_update}")
     print(f"final_mcc        : {final_eval['mcc']:.4f}")
     print(f"final_eval_loss  : {final_eval['eval_loss']:.4f}")
     print(f"trainable_params : {trainable_params}")
