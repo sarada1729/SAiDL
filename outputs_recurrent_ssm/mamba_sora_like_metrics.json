@@ -1,0 +1,94 @@
+{
+  "architecture": "mamba_like",
+  "method": "sora_like",
+  "trainable_params": 32850530,
+  "configured_rank": 8,
+  "final_eval_loss": 0.6226136603138663,
+  "final_mcc": 0.021324732257988185,
+  "total_train_time_sec": 1096.33744597435,
+  "rank_info": {
+    "effective_rank_sum": 96,
+    "effective_rank_list": [
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8
+    ]
+  },
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.6244546644041471,
+      "eval_loss": 0.61949952759526,
+      "mcc": 0.0,
+      "epoch_time_sec": 271.21479892730713,
+      "effective_rank_sum": 96,
+      "effective_rank_list": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.6166373901278059,
+      "eval_loss": 0.6220347032402501,
+      "mcc": 0.0,
+      "epoch_time_sec": 414.8534119129181,
+      "effective_rank_sum": 96,
+      "effective_rank_list": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.6051922953017405,
+      "eval_loss": 0.6226136603138663,
+      "mcc": 0.021324732257988185,
+      "epoch_time_sec": 368.92194390296936,
+      "effective_rank_sum": 96,
+      "effective_rank_list": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    }
+  ]
+}
